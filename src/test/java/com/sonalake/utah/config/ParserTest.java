@@ -5,6 +5,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -162,6 +163,61 @@ public class ParserTest {
     }};
 
     assertEquals(expectedValues, results);
+  }
+
+  @Test
+  public void testIterator() {
+    addPerRecordDelimiter("DELIM");
+    addValue("field", "field: (\\d*)");
+
+    FileBuilder file = new FileBuilder();
+    file.addLine("a line")
+            .addLine("another line")
+            .addLine("field: 1234")
+            .addLine("DELIM")
+            .addLine("hmmm line")
+            .addLine("field: 4567");
+
+    config.compilePatterns();
+    Parser parser = Parser.parse(config, file.buildReader());
+
+    Iterator<Map<String, String>> iterator = parser.iterator();
+    List<Map<String, String>> results = new ArrayList<>();
+
+    while(iterator.hasNext()) {
+      results.add(iterator.next());
+    }
+
+    List<Map<String, String>> expectedValues = new ArrayList<Map<String, String>>() {{
+      add(new TreeMap<String, String>() {{
+        put("field", "1234");
+      }});
+      add(new TreeMap<String, String>() {{
+        put("field", "4567");
+      }});
+    }};
+
+    assertEquals(expectedValues, results);
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void testMultipleInstantationOfIterator() {
+    addPerRecordDelimiter("DELIM");
+    addValue("field", "field: (\\d*)");
+
+    FileBuilder file = new FileBuilder();
+    file.addLine("a line")
+            .addLine("another line")
+            .addLine("field: 1234")
+            .addLine("DELIM")
+            .addLine("hmmm line")
+            .addLine("field: 4567");
+
+    config.compilePatterns();
+    Parser parser = Parser.parse(config, file.buildReader());
+
+    parser.iterator();
+    parser.iterator();
   }
 
   private void addHeaderDelimiter(String s) {

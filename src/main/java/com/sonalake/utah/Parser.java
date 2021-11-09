@@ -7,13 +7,17 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.Reader;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.TreeMap;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Parse a semi-structured text file, that can defined by the config.
  */
-public class Parser {
+public class Parser implements Iterable<Map<String, String>> {
 
   /**
    * The config.
@@ -28,6 +32,9 @@ public class Parser {
   private String previousDelim;
 
   private int recordNumber;
+
+  /** Hand out only one iterator dince we can consume the <code>reader</code> only once */
+  private boolean isIteratorAlreadyInstantiated = false;
 
   /**
    * Build the parser.
@@ -63,7 +70,9 @@ public class Parser {
    * Get the next record from the file.
    *
    * @return The next record, or null if there are none
+   * @deprecated Since 1.1.1, please use iterator instead
    */
+  @Deprecated
   public Map<String, String> next() {
     String rawRecord = getNextRecord(false);
     if (null == rawRecord) {
@@ -73,6 +82,16 @@ public class Parser {
       record.putAll(commonRecord);
       return record;
     }
+  }
+
+  @Override
+  public Iterator<Map<String, String>> iterator() {
+    if(isIteratorAlreadyInstantiated) {
+      throw new IllegalStateException("Only one interator per parser is supported");
+    }
+
+    isIteratorAlreadyInstantiated = true;
+    return new RecordIterator(this);
   }
 
   /**
@@ -134,4 +153,30 @@ public class Parser {
     }
   }
 
+  private static final class RecordIterator implements Iterator<Map<String, String>> {
+
+    private final Parser parser;
+    private Map<String, String> nextRecord;
+
+    RecordIterator(Parser parser) {
+      this.parser = requireNonNull(parser);
+      this.nextRecord = parser.next();
+    }
+
+    @Override
+    public boolean hasNext() {
+      return nextRecord != null;
+    }
+
+    @Override
+    public Map<String, String> next() {
+      if (nextRecord == null) {
+        throw new NoSuchElementException();
+      }
+
+      final Map<String, String> currentRecord = nextRecord;
+      nextRecord = parser.next();
+      return currentRecord;
+    }
+  }
 }
